@@ -1,0 +1,123 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use List::Util qw[min max];
+
+# extract pictures from pnm + fig, convert colors
+# usage: $0 file1.pnm ...
+
+# convert fig line with a rectanle into its dimensions
+sub get_bbox{
+  my $l=shift;
+  $l=~s/^\s+//;  $l=~s/\s+$//;
+  my @bbox = split /\s+/, $l;
+  my $x1 = min(map { $bbox[$_*2] }   0..int(@bbox/2)-1);
+  my $y1 = min(map { $bbox[$_*2+1] } 0..int(@bbox/2)-1);
+  my $x2 = max(map { $bbox[$_*2] }   0..int(@bbox/2)-1);
+  my $y2 = max(map { $bbox[$_*2+1] } 0..int(@bbox/2)-1);
+  return $x1, $x2, $y1, $y2;
+}
+
+foreach my $n (@ARGV){
+  $n=~s/.pnm$//;
+  my $fig="$n.fig";
+  my $pnm="$n.pnm";
+  my $ir="$n.ir";
+  my $jpg="$n.jpg";
+  print "Processing $n\n";
+
+  # dimensions of the pnm file
+  open F, $pnm or die "can't open $pnm: $!\n";
+  my $l=readline(F); #P6
+  $l=readline(F); 
+  $l=readline(F) if $l=~/^#/; # reread if it was a comment
+  my ($W,$H) = split /\s+/, $l;
+  close F;
+  print "  file size: $W x $H\n";
+
+  # extract information from the fig file:
+  my @frames;
+  my ($fW, $fH) = (0,0);
+  open F, $fig or die "can't open $fig: $!\n";
+  my $mode=0; # 0 - skip data; 1 - read image simensions; 2 - read frame box
+  foreach (<F>){
+    if ($mode==1){
+      my ($x1,$x2,$y1,$y2) = get_bbox($_);
+      $fW=($x2-$x1);
+      $fH=($y2-$y1);
+      $mode=0;
+      next;
+    }
+    if ($mode==2){
+      my ($x1,$x2,$y1,$y2) = get_bbox($_);
+      push @frames, {x1=>$x1, x2=>$x2, y1=>$y1, y2=>$y2, sortkey=> $y1*1e6+$x1};
+      $mode=0;
+      next;
+    }
+    if    (/$jpg/)  {$mode=1;}
+    elsif (/^2 2 /) {$mode=2;}
+    else {$mode=0;}
+  }
+  print "  fig size: $fW x $fH\n";
+
+  # process frames:
+  my $num=0;
+#  for (sort {$a->{sortkey} <=> $b->{sortkey}} @frames){
+  for (@frames){
+    $num++;
+    # note that in the fig ccw-rotated picture is used!
+    my $x1 = int($W - $_->{y2}/$fH*$W);
+    my $x2 = int($W - $_->{y1}/$fH*$W);
+    my $y1 = int($_->{x1}/$fW*$H);
+    my $y2 = int($_->{x2}/$fW*$H);
+
+    # Infrared size calibration (non-rotated coords).
+    # Measured IR->PIC coordinates
+    my ($x1src, $x1dst, $x2src, $x2dst) = (6,15,3020,3010);
+    my ($y1src, $y1dst, $y2src, $y2dst) = (0,0,11799,11797);
+    my $ax = ($x1src-$x2src)/($x1dst-$x2dst);
+    my $bx = $x1src-$x1dst*$ax;
+    my $ay = ($y1src-$y2src)/($y1dst-$y2dst);
+    my $by = $y1src-$y1dst*$ay;
+    my $x1i = int($x1*$ax + $bx); # pic->ir
+    my $x2i = int($x2*$ax + $bx);
+    my $y1i = int($y1*$ay + $by);
+    my $y2i = int($y2*$ay + $by);
+
+    print "  frame: $x1 - $x2, $y1 - $y2\n";
+    #print "  frame: $x1i - $x2i, $y1i - $y2i\n";
+    my $frW = $x2-$x1+1;
+    my $frH = $y2-$y1+1;
+    `pamcut -left $x1 -right $x2 -top $y1 -bottom $y2 $pnm |\
+       pamflip -ccw > tmp.pnm`;
+    `pamcut -left $x1i -right $x2i -top $y1i -bottom $y2i $ir |\
+       pamscale -width $frW -height $frH |\
+       pamflip -ccw > tmp.ir`;
+
+    `./undust -T 0.06 -R 50 tmp.pnm tmp.ir > tmpc.pnm`;
+
+print "process colors ir ${n}_${num}:\n";
+    `./1628 -R 125 -G 135 -B 145 tmpc.pnm |\
+        cjpeg -quality 95 > ${n}_${num}.jpg`;
+
+print "process colors org ${n}_${num}:\n";
+    `./1628 -R 125 -G 135 -B 145 tmp.pnm |\
+        cjpeg -quality 95 > ${n}_${num}o.jpg`;
+
+#    `cat tmpc.pnm |\
+#        cjpeg -quality 95 > ${n}_${num}_X.jpg`;
+
+#    `cat tmp.pnm |\
+#        cjpeg -quality 95 > ${n}_${num}_Y.jpg`;
+
+    `cat tmp.ir |\
+        cjpeg -quality 95 > ${n}_${num}_ir.jpg`;
+
+
+#    unlink "tmp.pnm";
+#    unlink "tmp.ir";
+#    unlink "tmpc.pnm";
+  }
+
+
+}

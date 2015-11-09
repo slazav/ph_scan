@@ -1,0 +1,61 @@
+#!/bin/bash -efu
+
+# Scan image with Canon 9000f scanner,
+# write huge pnm + jpeg preview.
+# Then you need to mark frames in xfig...
+
+# prefix from cmdline or default
+prefix=${1-PIC}
+
+# scan resolution
+res=1200
+
+# mode: Color/Grey
+mode=Color
+
+# do the scanning process or skip it: yes/no
+doscan=yes
+
+# multiple scans (use button to run scanner): yes/no
+multiple=no
+
+run=1;
+while [ $run == 1 ]; do
+  # stop the main loop if multiple!=yes
+  [ "$multiple" == yes ] || run=0
+
+  # find the next filename
+  n=1;
+  fname="$(printf "%s%02d" $prefix $n)"
+  while [ -f "$fname.pnm" -a "$doscan" == yes ]; do
+    n=$(($n+1))
+    fname="$(printf "%s%02d" $prefix $n)"
+  done
+
+  # scan process (if doscan==yes)
+  if [ "$doscan" == yes ]; then
+    scanimage --device=pixma:04A9190D\
+              --source="Transparency Unit"\
+              --mode=$mode\
+              --format=pnm \
+              --resolution=$res\
+              -l 76.41 -x 64.30 -t 20 -y 274\
+              --button-controlled=$multiple\
+             > $fname.pnm
+    scanimage --device=pixma:04A9190D\
+              --source="Transparency Unit"\
+              --mode=Infrared\
+              --format=pnm \
+              --resolution=$res\
+              -l 76.41 -x 64.30 -t 20 -y 274\
+              --button-controlled=$multiple\
+             > ${fname}.ir
+  fi
+
+  # make small preview
+  pamscale -height 3200 $fname.pnm | pamflip -ccw |\
+  pnminvert | pnmgamma 0.1  | cjpeg > $fname.jpg
+  #if [ -f "$fname.fig" ]; then rm -f "$fname.fig"; fi
+
+
+done
