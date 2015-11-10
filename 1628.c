@@ -131,10 +131,10 @@ main(int argc, char *argv[]){
     }
   }
 
-  fprintf(stderr, "%d %d %d  %d %d %d  %d %d %d\n",
-          min[0], (unsigned)avr[0], max[0],
-          min[1], (unsigned)avr[1], max[1],
-          min[2], (unsigned)avr[2], max[2]);
+//  fprintf(stderr, "%d %d %d  %d %d %d  %d %d %d\n",
+//          min[0], (unsigned)avr[0], max[0],
+//          min[1], (unsigned)avr[1], max[1],
+//          min[2], (unsigned)avr[2], max[2]);
 
 
   /* return back and do the color correction */

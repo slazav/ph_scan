@@ -50,7 +50,7 @@ foreach my $n (@ARGV){
     }
     if ($mode==2){
       my ($x1,$x2,$y1,$y2) = get_bbox($_);
-      push @frames, {x1=>$x1, x2=>$x2, y1=>$y1, y2=>$y2, sortkey=> $y1*1e6+$x1};
+      push @frames, {x1=>$x1, x2=>$x2, y1=>$y1, y2=>$y2, sortkey=> int($y1/500)*1e6+$x1};
       $mode=0;
       next;
     }
@@ -62,8 +62,7 @@ foreach my $n (@ARGV){
 
   # process frames:
   my $num=0;
-#  for (sort {$a->{sortkey} <=> $b->{sortkey}} @frames){
-  for (@frames){
+  for (sort {$a->{sortkey} <=> $b->{sortkey}} @frames){
     $num++;
     # note that in the fig ccw-rotated picture is used!
     my $x1 = int($W - $_->{y2}/$fH*$W);
@@ -88,31 +87,30 @@ foreach my $n (@ARGV){
     #print "  frame: $x1i - $x2i, $y1i - $y2i\n";
     my $frW = $x2-$x1+1;
     my $frH = $y2-$y1+1;
+    mkdir ${n} or {};
+
     `pamcut -left $x1 -right $x2 -top $y1 -bottom $y2 $pnm |\
-       pamflip -ccw > tmp.pnm`;
+       pamflip -ccw > ${n}/$num.pnm`;
     `pamcut -left $x1i -right $x2i -top $y1i -bottom $y2i $ir |\
        pamscale -width $frW -height $frH |\
-       pamflip -ccw > tmp.ir`;
+       pamflip -ccw > ${n}/${num}_ir.pnm`;
 
-    `./undust -T 0.06 -R 50 tmp.pnm tmp.ir > tmpc.pnm`;
+    #`./undust -T 0.06 -R 50 tmp.pnm tmp.ir > tmpc.pnm`;
 
-print "process colors ir ${n}_${num}:\n";
-    `./1628 -R 125 -G 135 -B 145 tmpc.pnm |\
-        cjpeg -quality 95 > ${n}_${num}.jpg`;
+    `./1628 -R 125 -G 135 -B 145 ${n}/${num}.pnm |\
+        cjpeg -quality 95 > ${n}/${num}.jpg`;
+    `cat ${n}/${num}_ir.pnm |\
+        cjpeg -quality 95 > ${n}/${num}_ir.jpg`;
 
-print "process colors org ${n}_${num}:\n";
-    `./1628 -R 125 -G 135 -B 145 tmp.pnm |\
-        cjpeg -quality 95 > ${n}_${num}o.jpg`;
+#print "process colors org ${n}_${num}:\n";
+#    `./1628 -R 125 -G 135 -B 145 tmp.pnm |\
+#        cjpeg -quality 95 > ${n}_${num}o.jpg`;
 
 #    `cat tmpc.pnm |\
 #        cjpeg -quality 95 > ${n}_${num}_X.jpg`;
 
 #    `cat tmp.pnm |\
 #        cjpeg -quality 95 > ${n}_${num}_Y.jpg`;
-
-    `cat tmp.ir |\
-        cjpeg -quality 95 > ${n}_${num}_ir.jpg`;
-
 
 #    unlink "tmp.pnm";
 #    unlink "tmp.ir";

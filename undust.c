@@ -141,7 +141,6 @@ main(int argc, char *argv[]){
       for (j=w-2; j>=0; j--){ if (stat[j]==0) stat[j+1]=0; }
     }
 
-fprintf(stderr, "3> %d\n", i);
     /* interpolation */
     for (j=1; j<w; j++){
       int n1m=j, n1p=j, n2m=j, n2p=j;

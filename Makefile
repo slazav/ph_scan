@@ -1,2 +1,2 @@
 LDLIBS=-lm
-all: 1628 undust
+all: 1628 undust2
