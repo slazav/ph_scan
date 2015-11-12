@@ -99,8 +99,8 @@ foreach my $n (@ARGV){
 
     `./1628 -R 125 -G 135 -B 145 ${n}/${num}.pnm |\
         cjpeg -quality 95 > ${n}/${num}.jpg`;
-    `cat ${n}/${num}_ir.pnm |\
-        cjpeg -quality 95 > ${n}/${num}_ir.jpg`;
+    #`cat ${n}/${num}_ir.pnm |\
+    #    cjpeg -quality 95 > ${n}/${num}_ir.jpg`;
 
 #print "process colors org ${n}_${num}:\n";
 #    `./1628 -R 125 -G 135 -B 145 tmp.pnm |\

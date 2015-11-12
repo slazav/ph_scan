@@ -25,7 +25,7 @@ main(int argc, char *argv[]){
   int      dh=100;
   int      neg=1;
   int      brd=200;
-  int      aval[3]={64,64,64};
+  int      aval[3]={130,140,150};
   int      cw=6, type;
   int      l=100,d=100;
   unsigned max[3], min[3];

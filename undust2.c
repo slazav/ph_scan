@@ -186,21 +186,24 @@ main(int argc, char *argv[]){
   double DX=0, DY=0;
   int    irrad=5;
   int    irthr=round(0.055*256*256);
+  const char *outd = NULL;
 
   /***************************************************************************/
   /* 1. Process command-line options */
   void usage(void){
     fprintf(stderr, "usage: %s OPTIONS in_file ir_file > out_file\n", argv[0]);
-    fprintf(stderr, "           -T name -- infrared threshold 0 .. 1.0 -- default 0.06\n");
-    fprintf(stderr, "           -R name -- interpolation radius, px    -- default 30\n");
+    fprintf(stderr, "           -T # -- infrared threshold 0 .. 1.0 -- default 0.06\n");
+    fprintf(stderr, "           -R # -- interpolation radius, px    -- default 30\n");
+    fprintf(stderr, "           -D name -- write dust picture in the file\n");
     exit(0);
   }
   while (1){
-    i=getopt(argc, argv, "T:R:");
+    i=getopt(argc, argv, "T:R:D:");
     if (i==-1) break;
     switch(i){
       case 'T': irthr=round(256*256*atof(optarg)); break;
       case 'R': irrad=atoi(optarg); break;
+      case 'D': outd=optarg; break;
       default:  usage();
     }
   }
@@ -346,58 +349,79 @@ main(int argc, char *argv[]){
   /* Remove correlation between IR and other channels
   /* subtract corr(IR,Red)/sigma(Red) * Red*/
 
-  //corr2(0, 0, round(DX), round(DY), w+h);
+  corr2(0, 0, round(DX), round(DY), w+h);
 
   /***************************************************************************/
   /* interpolation */
   {
-    int k, m1,m2,m3,m4,v0,dx,dy;
+    int k, m1,m2,m3,m4,v0,d1,d2,xd,yd;
+    int r1,r2,g1,g2,b1,b2;
     int intx,inty;
     for (i=0; i<w; i++){
       for (j=0; j<h; j++){
-        /* find left, right, top and bottom maximum */
+        /* find left, right, top and bottom maxima */
         m1=m2=m3=m4=0;
         v0=GET_IR(i,j);
-        for (k=0; k<irrad; k++){
-          if (i-k>=0 && GET_IR(i-k,j)>GET_IR(i-m1,j)) m1=k;
-          if (i+k<w  && GET_IR(i+k,j)>GET_IR(i+m2,j)) m2=k;
-          if (j-k>=0 && GET_IR(i,j-k)>GET_IR(i,j-m3)) m3=k;
-          if (j+k<h  && GET_IR(i,j+k)>GET_IR(i,j+m4)) m4=k;
+        for (k=0; k<irrad; k++){ /* note 1 px additional space for m1..m4*/
+          if (i-k-1>=0 && GET_IR(i-k,j)>GET_IR(i-m1,j)) m1=k;
+          if (i+k+1<w  && GET_IR(i+k,j)>GET_IR(i+m2,j)) m2=k;
+          if (j-k-1>=0 && GET_IR(i,j-k)>GET_IR(i,j-m3)) m3=k;
+          if (j+k+1<h  && GET_IR(i,j+k)>GET_IR(i,j+m4)) m4=k;
         }
-        /* move the maxima to the center */
+        /* check do we need interpolation */
         intx=0; inty=0;
-        if (GET_IR(i-m1,j)-v0 > irthr && GET_IR(i+m2,j)-v0 > irthr){
-          for (k=m1; GET_IR(i-m1,j)-GET_IR(i-k,j) < irthr/2; k--); m1=k;
-          for (k=m2; GET_IR(i+m2,j)-GET_IR(i+k,j) < irthr/2; k--); m2=k;
-          intx=1;
-        }
-        if (GET_IR(i,j-m3)-v0 > irthr && GET_IR(i,j+m4)-v0 > irthr){
-          for (k=m3; GET_IR(i,j-m3)-GET_IR(i,j-k) < irthr/2; k--); m3=k;
-          for (k=m4; GET_IR(i,j+m4)-GET_IR(i,j+k) < irthr/2; k--); m4=k;
-          inty=1;
-        }
-        if (intx==0 && inty==0) continue;
-        if (intx && inty){ /* shortest way */
-          if (m1+m2 > m3+m4) inty=0; else intx=0;
-        }
-        // remove wide and shellow zones
-        dx=(GET_IR(i-m1,j) + GET_IR(i+m2,j) - 2*v0)/2; // depth in x direction
-        dy=(GET_IR(i,j-m3) + GET_IR(i,j+m3) - 2*v0)/2;
-//        if (dx < irthr*(0.1 - 0.005*(m1+m2-2))) intx=0;
-//        if (dy < irthr*(0.1 - 0.005*(m3+m4-2))) inty=0;
+        if (GET_IR(i-m1,j)-v0 > irthr && GET_IR(i+m2,j)-v0 > irthr) intx=1;
+        if (GET_IR(i,j-m3)-v0 > irthr && GET_IR(i,j+m4)-v0 > irthr) inty=1;
 
+        if (intx==0 && inty==0) continue;
+//        if (intx && inty){ /* shortest way */
+//          if (m1+m2 > m3+m4) intx=0; else inty=0;
+//        }
+
+        //m1++; m2++;m3++;m4++;
         if (intx){
-          //for (k=-m1+1; k<m2; k++) SET_IR(i+k,j, 0x0);
-          SET_IR(i,j, 0x0);
+          r1 = GET_R(i-m1,j); r2 = GET_R(i+m2,j);
+          g1 = GET_G(i-m1,j); g2 = GET_G(i+m2,j);
+          b1 = GET_B(i-m1,j); b2 = GET_B(i+m2,j);
+          d1 = m1; d2 = m2;
+          for (k=-m1+1; k<m2; k++){
+            d1 = m1+k; d2 = m2-k;
+            xd=i+k+DX; yd=j+DY;
+            if (xd<0 || xd>=w || yd<0 || yd>=h || d1+d2<1) continue;
+            SET_RGB(xd,yd, (r1*d2+r2*d1)/(d1+d2),
+                           (g1*d2+g2*d1)/(d1+d2),
+                           (b1*d2+b2*d1)/(d1+d2));
+             //SET_RGB(xd,yd, 0,0xFFFF,0xFFFF);
+          }
         }
         if (inty){
-          //for (k=-m3+1; k<m4; k++) SET_IR(i,j+k, 0x0);
+          r1 = GET_R(i,j-m3); r2 = GET_R(i,j+m4);
+          g1 = GET_G(i,j-m3); g2 = GET_G(i,j+m4);
+          b1 = GET_B(i,j-m3); b2 = GET_B(i,j+m4);
+          d1 = m3; d2 = m4;
+          for (k=-m3+1; k<m4; k++){
+            d1 = m3+k; d2 = m4-k;
+            xd=i+DX; yd=j+k+DY;
+            if (xd<0 || xd>=w || yd<0 || yd>=h || d1+d2<1) continue;
+              SET_RGB(xd,yd, (r1*d2+r2*d1)/(d1+d2),
+                           (g1*d2+g2*d1)/(d1+d2),
+                           (b1*d2+b2*d1)/(d1+d2));
+            //SET_RGB(xd,yd, 0xFFFF,0xFFFF,0);
+          }
+        }
+        if (inty || intx){
+//          xd=i+DX; yd=j+DY;
+//          if (xd>=0 && xd<w && yd>=0 && yd<h){
+//            SET_RGB(xd,yd, (r1*d2+r2*d1)/(d1+d2),
+//                           (g1*d2+g2*d1)/(d1+d2),
+//                           (b1*d2+b2*d1)/(d1+d2));
+//          }
           SET_IR(i,j, 0x0);
         }
-
       }
     }
   }
+
 
 //      xd=x+dx; yd=y+dy;
 //      if (xd<0 || xd>=w || yd<0 || yd>=h) continue;
@@ -406,13 +430,19 @@ main(int argc, char *argv[]){
   /***************************************************************************/
   /* Save the data*/
 
-//  printf("P%d\n%d %d\n%d\n",cw==2?5:6,w,h,256*256-1);
-//  if (fwrite(buf, cw, w*h, stdout)!=w*h) {fprintf(stderr, "Write Error!\n"); exit(0);}
+  printf("P%d\n%d %d\n%d\n",cw==2?5:6,w,h,256*256-1);
+  if (fwrite(buf, cw, w*h, stdout)!=w*h) {fprintf(stderr, "Write Error!\n"); exit(0);}
 
-
-
-  printf("P%d\n%d %d\n%d\n",5,w,h,256*256-1);
-  if (fwrite(irbuf, 2, w*h, stdout)!=w*h) {fprintf(stderr, "Write Error!\n"); exit(0);}
+  if (outd){
+    FILE *OUT = fopen(outd, "w");
+    if (OUT==NULL){
+      fprintf(stderr, "can't open file: %s\n", outd);
+      exit(0);
+    }
+    fprintf(OUT, "P%d\n%d %d\n%d\n",5,w,h,256*256-1);
+    if (fwrite(irbuf, 2, w*h, OUT)!=w*h) {fprintf(stderr, "Write Error!\n"); exit(0);}
+    fclose(OUT);
+  }
 
 }
 //
