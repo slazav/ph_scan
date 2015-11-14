@@ -37,9 +37,10 @@ foreach my $n (@ARGV){
 
   # extract information from the fig file:
   my @frames;
+  my @texts;
   my ($fW, $fH) = (0,0);
   open F, $fig or die "can't open $fig: $!\n";
-  my $mode=0; # 0 - skip data; 1 - read image simensions; 2 - read frame box
+  my $mode=0; # 0 - skip data; 1 - read image simensions; 2 - read frame box;
   foreach (<F>){
     if ($mode==1){
       my ($x1,$x2,$y1,$y2) = get_bbox($_);
@@ -56,13 +57,29 @@ foreach my $n (@ARGV){
     }
     if    (/$jpg/)  {$mode=1;}
     elsif (/^2 2 /) {$mode=2;}
+    elsif (/^4(\s+\S+){10}\s+(\d+)\s+(\d+)\s+(\S+)\\001/) {
+      push @texts, {x=>$2, y=>$3, t=>$4};
+      $mode=0;
+    }
     else {$mode=0;}
   }
   print "  fig size: $fW x $fH\n";
 
+  # join text to frames
+  for (my $n=0; $n<=$#frames; $n++){
+    my $f=$frames[$n];
+    foreach my $t (@texts){
+      if ($t->{x} > $f->{x1} && $t->{x} < $f->{x2} &&
+          $t->{y} > $f->{y1} && $t->{y} < $f->{y2}){
+        $frames[$n]->{t}=$t->{t};
+      }
+    }
+  }
+
+
   # process frames:
   my $num=0;
-  for (sort {$a->{sortkey} <=> $b->{sortkey}} @frames){
+  foreach (sort {$a->{sortkey} <=> $b->{sortkey}} @frames){
     $num++;
     # note that in the fig ccw-rotated picture is used!
     my $x1 = int($W - $_->{y2}/$fH*$W);
@@ -83,38 +100,39 @@ foreach my $n (@ARGV){
     my $y1i = int($y1*$ay + $by);
     my $y2i = int($y2*$ay + $by);
 
-    print "  frame: $x1 - $x2, $y1 - $y2\n";
+    #process text for this frame:
+    my $t = $_->{t};
+    my $flt="";
+    $flt="| pamflip -r180" if ($t=~s/RR// || $t=~s/LL//);
+    $flt="| pamflip -ccw" if ($t=~s/L//);
+    $flt="| pamflip -cw" if ($t=~s/R//);
+    $t=sprintf("x%02d", $num) if $t eq "";
+
+    print "  frame $t: $x1 - $x2, $y1 - $y2\n";
     #print "  frame: $x1i - $x2i, $y1i - $y2i\n";
     my $frW = $x2-$x1+1;
     my $frH = $y2-$y1+1;
-    mkdir ${n} or {};
+    mkdir ${n} or 1;
 
+    # RGB 48-bit pnm image
     `pamcut -left $x1 -right $x2 -top $y1 -bottom $y2 $pnm |\
-       pamflip -ccw > ${n}/$num.pnm`;
+       pamflip -ccw $flt > ${n}/${t}_u.pnm`;
+    `./1628 -R 130 -G 140 -B 150 ${n}/${t}_u.pnm |\
+        cjpeg -quality 95 > ${n}/${t}o.jpg`;
+
+    # IR 16-bit pnm image
     `pamcut -left $x1i -right $x2i -top $y1i -bottom $y2i $ir |\
        pamscale -width $frW -height $frH |\
-       pamflip -ccw > ${n}/${num}_ir.pnm`;
+       pamflip -ccw $flt > ${n}/${t}_ir.pnm`;
+    #`cat ${n}/${t}_ir.pnm | cjpeg -quality 95 > ${n}/${t}_ir.jpg`;
 
-    #`./undust -T 0.06 -R 50 tmp.pnm tmp.ir > tmpc.pnm`;
+    # corrected image
+    #`./undust2 -T 0.06 -R 10 -D ${n}/${t}_d.pnm ${n}/$t.pnm ${n}/${t}_ir.pnm|\
+    #   > ${n}/${t}_corr.pnm`;
+    #`./1628 -R 125 -G 135 -B 145 ${n}/${t}_corr.pnm |\
+    #    cjpeg -quality 95 > ${n}/${t}_corr.jpg`;
+    #`cat ${n}/${t}_d.pnm | cjpeg -quality 95 > ${n}/${t}_d.jpg`;
 
-    `./1628 -R 125 -G 135 -B 145 ${n}/${num}.pnm |\
-        cjpeg -quality 95 > ${n}/${num}.jpg`;
-    #`cat ${n}/${num}_ir.pnm |\
-    #    cjpeg -quality 95 > ${n}/${num}_ir.jpg`;
-
-#print "process colors org ${n}_${num}:\n";
-#    `./1628 -R 125 -G 135 -B 145 tmp.pnm |\
-#        cjpeg -quality 95 > ${n}_${num}o.jpg`;
-
-#    `cat tmpc.pnm |\
-#        cjpeg -quality 95 > ${n}_${num}_X.jpg`;
-
-#    `cat tmp.pnm |\
-#        cjpeg -quality 95 > ${n}_${num}_Y.jpg`;
-
-#    unlink "tmp.pnm";
-#    unlink "tmp.ir";
-#    unlink "tmpc.pnm";
   }
 
 
