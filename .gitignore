@@ -3,3 +3,7 @@ undust
 undust3
 test_uncorr
 test_shift
+*.o
+*.pnm
+*.jpg
+*.png
