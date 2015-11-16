@@ -36,11 +36,11 @@ main(int argc, char *argv[]){
   PNM  ir(argv[optind+1]);
 
   cnv = ir_shift(pnm,ir,0);
-  ir_uncorr(pnm, ir, &cnv);
+  ir_uncorr(pnm, ir, cnv);
 
   PNM mask = detect_dust1(ir, thr);
   expand_dust(mask);
-  interp(pnm, mask, &cnv);
+  interp(pnm, mask, cnv);
 
 
   ir.save(argv[optind+2]);

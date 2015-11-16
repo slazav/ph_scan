@@ -110,7 +110,7 @@ PNM::calc_mmm(int &min, int &mean, int &max, int ch) const{
   min=get_mcol(); max=0;
   for (x=0; x<w; x++){
     for (y=0; y<h; y++){
-      v=get(ch,x,y);
+      v=get(ch,PT(x,y));
       sum += v;
       if (min>v) min=v;
       if (max<v) max=v;

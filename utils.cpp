@@ -11,14 +11,15 @@ using namespace std;
 /***************************************************************************/
 /* Find conversion from IR to RGB image */
 cnv_t
-ir_shift(PNM &rgb, PNM &ir, int neg){
+ir_shift(const PNM &rgb, const PNM &ir, int neg){
+  PT p;
 
   /* build a histogram of the IR channel */
   int hist[ir.get_mcol()+1];
   memset(hist,0, sizeof(hist));
-  for (int i=0; i<ir.w; i++){
-    for (int j=0; j<ir.h; j++){
-      hist[ir.get(0,i,j)]++;
+  for (p.x=0; p.x<ir.w; p.x++){
+    for (p.y=0; p.y<ir.h; p.y++){
+      hist[ir.get(0,p)]++;
     }
   }
 
@@ -30,39 +31,41 @@ ir_shift(PNM &rgb, PNM &ir, int neg){
 
   /* put all points below the level into a vector */
   PTS ir_dark;
-  for (int i=0; i<ir.w; i++){
-    for (int j=0; j<ir.h; j++){
-      if (ir.get(0,i,j) < ll){ ir_dark.push_back(PT(i,j));
-      ir.set(0,i,j,0);}
+  for (p.x=0; p.x<ir.w; p.x++){
+    for (p.y=0; p.y<ir.h; p.y++){
+      if (ir.get(0,p) < ll) ir_dark.push_back(p);
     }
   }
 
   /* */
   int rad=10;
   cnv_t ret;
-  int mval = ir_dark.size()*ir.get_mcol();
+  int mval = ir.get_mcol();
   int s0m=mval;
 
-  for (int x1=-10; x1<=10; x1++){
-    for (int y1=-10; y1<=10; y1++){
-//       for (int x2=-10; x2<=10; x2++){
-//         for (int y2=-10; y2<=10; y2++){
+  for (int x1=-rad; x1<=rad; x1++){
+    for (int y1=-rad; y1<=rad; y1++){
+//       for (int x2=-rad; x2<=rad; x2++){
+//         for (int y2=-rad; y2<=rad; y2++){
 
           cnv_t cnv; /* (0.0) -> (x1,y1), (ir.w,ir.h)->(rgb.w+x2,rgb.h+y2) */
+          cnv.dx=x1; cnv.dy=y1;
+
 //          cnv.kx=(rgb.w+x2-x1)/(double)ir.w;
 //          cnv.ky=(rgb.h+y2-y1)/(double)ir.h;
-          cnv.dx=x1; cnv.dy=y1;
-          cnv.kx=1;
-          cnv.ky=1;
+            cnv.kx=1; cnv.ky=1;
 
           /* calculate sums */
           long long s0=0;
+          int n=0;
           for (PTS::const_iterator i=ir_dark.begin(); i!=ir_dark.end(); i++){
-            int xd = cnv.kx * i->x + cnv.dx;
-            int yd = cnv.ky * i->y + cnv.dy;
-            if (xd<0 || xd>=rgb.w || yd<0 || yd>=rgb.h) continue;
-            s0 += rgb.get(0,xd,yd);
+            PT pd(cnv.kx * i->x + cnv.dx,
+                  cnv.ky * i->y + cnv.dy);
+            if (!rgb.is_in(pd)) continue;
+            s0 += rgb.get(0,pd);
+            n++;
           }
+          s0/=n;
           if (neg) s0 = mval - s0;
           if (s0<s0m) {s0m=s0; ret=cnv; }
 //        }
@@ -77,7 +80,7 @@ ir_shift(PNM &rgb, PNM &ir, int neg){
 
 /* reduce dispersion of the IR channel using RGB image */
 int
-ir_uncorr(PNM &rgb, PNM &ir, cnv_t *cnv){
+ir_uncorr(const PNM &rgb, PNM &ir, const cnv_t &cnv){
   int x,y,xd,yd,n=0;
   /* mean values */
   double mR=0, mG=0, mB=0, mI=0;
@@ -114,14 +117,14 @@ ir_uncorr(PNM &rgb, PNM &ir, cnv_t *cnv){
   /* calculate average values */
   for (x=0; x<ir.w; x++){
     for (y=0; y<ir.h; y++){
-      xd = cnv->kx*x + cnv->dx;
-      yd = cnv->ky*y + cnv->dy;
-      if (xd<0 || xd>=rgb.w || yd<0 || yd>=rgb.h) continue;
-      mR += (double)rgb.get(0,xd,yd); /* rgb/grey */
-      mI += (double)ir.get(0,x,y);
+      PT pd(cnv.kx*x + cnv.dx,
+            cnv.ky*y + cnv.dy);
+      if (!rgb.is_in(pd)) continue;
+      mR += (double)rgb.get(0,pd); /* rgb/grey */
+      mI += (double)ir.get(0,PT(x,y));
       if (rgb.is_rgb()){ /* rgb */
-        mG += (double)rgb.get(1,xd,yd);
-        mB += (double)rgb.get(2,xd,yd);
+        mG += (double)rgb.get(1,pd);
+        mB += (double)rgb.get(2,pd);
       }
       n++;
     }
@@ -131,17 +134,17 @@ ir_uncorr(PNM &rgb, PNM &ir, cnv_t *cnv){
   /* calculate correlations */
   for (x=0; x<ir.w; x++){
     for (y=0; y<ir.h; y++){
-      xd = cnv->kx*x + cnv->dx;
-      yd = cnv->ky*y + cnv->dy;
-      if (xd<0 || xd>=rgb.w || yd<0 || yd>=rgb.h) continue;
+      PT pd(cnv.kx*x + cnv.dx,
+            cnv.ky*y + cnv.dy);
+      if (!rgb.is_in(pd)) continue;
 
-      dR = (double)rgb.get(0,xd,yd) - mR;
-      dI = (double)ir.get(0,x,y) - mI;
+      dR = (double)rgb.get(0,pd) - mR;
+      dI = (double)ir.get(0,PT(x,y)) - mI;
       RR += dR*dR;
       IR += dI*dR;
       if (rgb.is_rgb()){ /* rgb */
-        dG = (double)rgb.get(0,xd,yd) - mG;
-        dB = (double)rgb.get(0,xd,yd) - mB;
+        dG = (double)rgb.get(0,pd) - mG;
+        dB = (double)rgb.get(0,pd) - mB;
         RG += dR*dG;
         RB += dR*dB;
         GG += dG*dG;
@@ -165,18 +168,19 @@ ir_uncorr(PNM &rgb, PNM &ir, cnv_t *cnv){
   /* modify IR image */
   for (x=0; x<ir.w; x++){
     for (y=0; y<ir.h; y++){
-      xd = cnv->kx*x + cnv->dx;
-      yd = cnv->ky*y + cnv->dy;
-      if (xd<0 || xd>=rgb.w || yd<0 || yd>=rgb.h) continue;
-      dR = (double)rgb.get(0,xd,yd)-mR; /* rgb/grey */
-      dI = (double)ir.get(0,x,y);
+      PT p(x,y);
+      PT pd(cnv.kx*x + cnv.dx,
+            cnv.ky*y + cnv.dy);
+      if (!rgb.is_in(pd)) continue;
+      dR = (double)rgb.get(0,pd)-mR; /* rgb/grey */
+      dI = (double)ir.get(0,p);
       if (rgb.is_rgb()){ /* rgb */
-        dG = (double)rgb.get(1,xd,yd)-mG;
-        dB = (double)rgb.get(2,xd,yd)-mB;
-        ir.set(0, x,y, (int)(dI - A*dR - B*dG - C*dB));
+        dG = (double)rgb.get(1,pd)-mG;
+        dB = (double)rgb.get(2,pd)-mB;
+        ir.set(0, p, (int)(dI - A*dR - B*dG - C*dB));
       }
       else{
-        ir.set(0, x,y, (int)(dI - A*dR));
+        ir.set(0, p, (int)(dI - A*dR));
       }
     }
   }
@@ -185,24 +189,24 @@ ir_uncorr(PNM &rgb, PNM &ir, cnv_t *cnv){
 
 PNM
 detect_dust1(PNM &ir, double thr){
-  int x,y;
+  PT p;
   double mI=0,dI=0;
   PNM ret(ir.w, ir.h, 1);
 
   /* calculate average value of IR */
-  for (x=0; x<ir.w; x++){
-    for (y=0; y<ir.h; y++){
-      mI += (double)ir.get(0,x,y)/(double)(ir.w*ir.h);
+  for (p.x=0; p.x<ir.w; p.x++){
+    for (p.y=0; p.y<ir.h; p.y++){
+      mI += (double)ir.get(0,p)/(double)(ir.w*ir.h);
     }
   }
 
   /* detect dust (everything below mI-thr)*/
   thr = thr * (256*256-1); /* 0..1 -> pixels */
 
-  for (x=0; x<ir.w; x++){
-    for (y=0; y<ir.h; y++){
-      dI = mI - (double)ir.get(0,x,y);
-      if (dI > thr) ret.set(0,x,y, 255);
+  for (p.x=0; p.x<ir.w; p.x++){
+    for (p.y=0; p.y<ir.h; p.y++){
+      dI = mI - (double)ir.get(0,p);
+      if (dI > thr) ret.set(0,p, 255);
     }
   }
   return ret;
@@ -211,23 +215,18 @@ detect_dust1(PNM &ir, double thr){
 /**************************************************************************/
 void
 expand_dust(PNM &mask){
-  int x,y;
-  for (x=1; x<mask.w-1; x++){
-    for (y=1; y<mask.h-1; y++){
-      if (mask.get(0,x-1,y-1)>1) continue;
-      if (mask.get(0,x-1,y-1)>1 ||
-          mask.get(0,x-1,y  )>1 ||
-          mask.get(0,x-1,y+1)>1 ||
-          mask.get(0,x  ,y-1)>1 ||
-          mask.get(0,x  ,y+1)>1 ||
-          mask.get(0,x+1,y-1)>1 ||
-          mask.get(0,x+1,y  )>1 ||
-          mask.get(0,x+1,y+1)>1) mask.set(0,x,y,1);
+  PT p;
+  for (p.x=1; p.x<mask.w-1; p.x++){
+    for (p.y=1; p.y<mask.h-1; p.y++){
+      if (mask.get(0,p)>1) continue;
+      for (int i=0;i<8;i++){
+        if (mask.get(0,p.adj(0))>1) mask.set(0,p,1);
+      }
     }
   }
-  for (x=1; x<mask.w-1; x++){
-    for (y=1; y<mask.h-1; y++){
-       if (mask.get(0,x,y)==1) mask.set(0,x,y,0xFFFF);
+  for (p.x=1; p.x<mask.w-1; p.x++){
+    for (p.y=1; p.y<mask.h-1; p.y++){
+       if (mask.get(0,p)==1) mask.set(0,p,0xFF);
     }
   }
 }
@@ -240,7 +239,7 @@ get_spot(const PNM &mask, const PT& p, int max){
   set<PT> ret;
   queue<PT> q;
 
-  int h = mask.get(0,p.x,p.y);
+  int h = mask.get(0,p);
   q.push(p); ret.insert(p);
 
   while (!q.empty()){
@@ -248,8 +247,8 @@ get_spot(const PNM &mask, const PT& p, int max){
     q.pop();
     for (int i=0; i<8; i++){
       PT p2 = p1.adj(i);
-      if (p2.x<0 || p2.x>=mask.w || p2.y<0 || p2.y>=mask.h) continue;
-      if ((mask.get(0,p2.x,p2.y) == h)&&(ret.insert(p2).second)) q.push(p2);
+      if (!mask.is_in(p2)) continue;
+      if ((mask.get(0,p2) == h)&&(ret.insert(p2).second)) q.push(p2);
     }
     if ((max!=0)&&(ret.size()>max)) break;
   }
@@ -271,52 +270,59 @@ border(const set<PT> & pset){
 }
 
 void
-interp(PNM &rgb, PNM &mask, cnv_t *cnv){
-  int x,y,x0,y0,xm,ym,xp,yp;
-  int rm,rp,gm,gp,bm,bp,dm,dp;
-  int intx,inty;
+interp(PNM &rgb, PNM &mask, const cnv_t &cnv){
+  PT p;
 
-  for (x=0; x<mask.w; x++){
-    for (y=0; y<mask.h; y++){
+  for (p.x=0; p.x<mask.w; p.x++){
+    for (p.y=0; p.y<mask.h; p.y++){
       //  do we need interpolation of this point?
-      if (mask.get(0,x,y)==0) continue;
+      if (mask.get(0,p)!=255) continue;
 
 
       // find the whole interpolation area and its border
-      set<PT> pset = get_spot(mask, PT(x,y), 10000);
+      set<PT> pset = get_spot(mask, p, 1000);
       set<PT> bord = border(pset);
       set<PT>::iterator pi, bi;
 
       for (pi = pset.begin(); pi != pset.end(); pi++){
         // convert to rgb coordinates
-        int xd = cnv->kx*pi->x + cnv->dx;
-        int yd = cnv->ky*pi->y + cnv->dy;
-        if (xd<0 || xd>=rgb.w || yd<0 || yd>=rgb.h) continue;
+        PT pd(cnv.kx*pi->x + cnv.dx,
+              cnv.ky*pi->y + cnv.dy);
+        if (!rgb.is_in(pd)) continue;
 
         double SR=0, SG=0, SB=0, S=0;
         for (bi = bord.begin(); bi != bord.end(); bi++){
 
           // convert to rgb coordinates
-          int bxd = cnv->kx*bi->x + cnv->dx;
-          int byd = cnv->ky*bi->y + cnv->dy;
-          if (bxd<0 || bxd>=rgb.w || byd<0 || byd>=rgb.h) continue;
-
-          double w = 1.0/(double)(pow(bxd - xd,2) + pow(byd - yd,2));
+          PT bpd(cnv.kx*bi->x + cnv.dx,
+                 cnv.ky*bi->y + cnv.dy);
+          if (!rgb.is_in(bpd)) continue;
+          double w = 1.0/(double)(pow(bpd.x-pd.x,2) + pow(bpd.y-pd.y,2));
+          w = w*w;
 
           S  += w;
-          SR += w*rgb.get(0,bxd,byd);
+          SR += w*rgb.get(0,bpd);
           if (rgb.is_rgb()){
-            SG += w*rgb.get(1,bxd,byd);
-            SB += w*rgb.get(2,bxd,byd);
+            SG += w*rgb.get(1,bpd);
+            SB += w*rgb.get(2,bpd);
           }
         }
+        mask.set(0,*pi,254);
 
-        rgb.set(0, xd, yd, SR/S);
-        mask.set(0, pi->x, pi->y,0);
+        /* interpolate only darker points! */
+        //if (rgb.get(0, pd) < SR/S) rgb.set(0, pd, SR/S);
+        //if (rgb.is_rgb()){
+        //  if (rgb.get(1, pd) < SG/S) rgb.set(1, pd, SG/S);
+        //  if (rgb.get(2, pd) < SB/S) rgb.set(2, pd, SB/S);
+        //}
+
+        /* interpolate only darker points! */
+        rgb.set(0, pd, SR/S);
         if (rgb.is_rgb()){
-          rgb.set(1, xd, yd, SG/S);
-          rgb.set(2, xd, yd, SB/S);
+          rgb.set(1, pd, SG/S);
+          rgb.set(2, pd, SB/S);
         }
+
       }
     }
   }

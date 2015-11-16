@@ -61,66 +61,44 @@ class PNM {
   int save(const char *fname) const;
 
   int calc_mmm(int &min, int &mean, int &max, int ch) const;
+  int is_in(const PT &p) const {
+    return p.x>=0 && p.x<w && p.y>=0 && p.y<h; }
 
   /********************************************************************/
-  /* get/set functions */
-  /* read functions for 8 and 16 bit data (no internal checks). */
-  int get8(int ch, int x, int y) const{
-    return buf[bpp*(y*w+x)+ch]; }
-  int get16(int ch, int x, int y) const{
-    return buf[bpp*(y*w+x)+2*ch]*256
-         + buf[bpp*(y*w+x)+2*ch+1]; }
-
-  int get(int ch, int x, int y) const{
+  /* get function (no internal checks). */
+  int get(int ch, const PT &p) const{
     if (bpp==6 || bpp==2)
-      return buf[bpp*(y*w+x)+2*ch]*256
-           + buf[bpp*(y*w+x)+2*ch+1];
+      return buf[bpp*(p.y*w+p.x)+2*ch]*256
+           + buf[bpp*(p.y*w+p.x)+2*ch+1];
     if (bpp==3 || bpp==1)
-      return buf[bpp*(y*w+x)+ch];
+      return buf[bpp*(p.y*w+p.x)+ch];
     return -1;
   }
 
-  /* write functions for 8 and 16 bit data (no internal checks). */
-  void set8(int ch, int x, int y, int v){
-    buf[bpp*(y*w+x)+ch] = v&0xFF; }
-  void set16(int ch, int x, int y, int v){
-    buf[bpp*(y*w+x)+2*ch]   = (v>>8)&0xFF;
-    buf[bpp*(y*w+x)+2*ch+1] = v&0xFF; }
-  void set(int ch, int x, int y, int v){
+  /* set function (no internal checks). */
+  void set(int ch, const PT &p, int v){
     if (bpp==6 || bpp==2){
-      buf[bpp*(y*w+x)+2*ch]   = (v>>8)&0xFF;
-      buf[bpp*(y*w+x)+2*ch+1] = v&0xFF; }
+      buf[bpp*(p.y*w+p.x)+2*ch]   = (v>>8)&0xFF;
+      buf[bpp*(p.y*w+p.x)+2*ch+1] = v&0xFF; }
     if (bpp==3 || bpp==1){
-      buf[bpp*(y*w+x)+ch] = v&0xFF; }
+      buf[bpp*(p.y*w+p.x)+ch] = v&0xFF; }
   }
 
-  void set8rgb(int x, int y, int r, int g, int b){
-    buf[bpp*(y*w+x)+0] = r&0xFF;
-    buf[bpp*(y*w+x)+1] = g&0xFF;
-    buf[bpp*(y*w+x)+2] = b&0xFF;
-  }
-  void set16rgb(int x, int y, int r, int g, int b){
-    buf[bpp*(y*w+x)+0] = (r>>8)&0xFF;
-    buf[bpp*(y*w+x)+1] =  r&0xFF;
-    buf[bpp*(y*w+x)+2] = (g>>8)&0xFF;
-    buf[bpp*(y*w+x)+3] =  g&0xFF;
-    buf[bpp*(y*w+x)+4] = (b>>8)&0xFF;
-    buf[bpp*(y*w+x)+5] =  b&0xFF;
-  }
-  void setrgb(int x, int y, int r, int g, int b){
+  /* setrgb function (no internal checks). */
+  void setrgb(const PT &p, int r, int g, int b){
     if (bpp==6){
-      buf[bpp*(y*w+x)+0] = (r>>8)&0xFF;
-      buf[bpp*(y*w+x)+1] =  r&0xFF;
-      buf[bpp*(y*w+x)+2] = (g>>8)&0xFF;
-      buf[bpp*(y*w+x)+3] =  g&0xFF;
-      buf[bpp*(y*w+x)+4] = (b>>8)&0xFF;
-      buf[bpp*(y*w+x)+5] =  b&0xFF;
+      buf[bpp*(p.y*w+p.x)+0] = (r>>8)&0xFF;
+      buf[bpp*(p.y*w+p.x)+1] =  r&0xFF;
+      buf[bpp*(p.y*w+p.x)+2] = (g>>8)&0xFF;
+      buf[bpp*(p.y*w+p.x)+3] =  g&0xFF;
+      buf[bpp*(p.y*w+p.x)+4] = (b>>8)&0xFF;
+      buf[bpp*(p.y*w+p.x)+5] =  b&0xFF;
       return;
     }
     if (bpp==3){
-      buf[bpp*(y*w+x)+0] = r&0xFF;
-      buf[bpp*(y*w+x)+1] = g&0xFF;
-      buf[bpp*(y*w+x)+2] = b&0xFF;
+      buf[bpp*(p.y*w+p.x)+0] = r&0xFF;
+      buf[bpp*(p.y*w+p.x)+1] = g&0xFF;
+      buf[bpp*(p.y*w+p.x)+2] = b&0xFF;
       return;
     }
   }
