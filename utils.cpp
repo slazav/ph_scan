@@ -1,6 +1,12 @@
 #include <cstdio>
 #include <cmath>
+
+#include <map>
+#include <queue>
+#include <set>
 #include "utils.h"
+
+using namespace std;
 
 /**************************************************************************/
 
@@ -155,7 +161,7 @@ expand_dust(PNM &mask){
   }
   for (x=1; x<mask.w-1; x++){
     for (y=1; y<mask.h-1; y++){
-       if (mask.get(0,x+1,y+1)==1) mask.set(0,x,y,0xFFFF);
+       if (mask.get(0,x,y)==1) mask.set(0,x,y,0xFFFF);
     }
   }
 }
@@ -241,6 +247,122 @@ interp1(PNM &rgb, PNM &mask, cnv_t *cnv){
     }
   }
 }
+
+/********************/
+/* point functions */
+PT
+PT::adj(const int dir) const{
+  switch(dir%8){
+    case 0: return PT(x-1,y-1);
+    case 1: return PT(x,  y-1);
+    case 2: return PT(x+1,y-1);
+    case 3: return PT(x+1,y  );
+    case 4: return PT(x+1,y+1);
+    case 5: return PT(x,  y+1);
+    case 6: return PT(x-1,y+1);
+    case 7: return PT(x-1,y  );
+  }
+  return PT();
+}
+
+int
+PT::is_adj(const PT & p) const{
+  for (int i = 0; i<8; i++){
+    if (p.adj(i) == PT(x,y)) return i; }
+  return -1;
+}
+
+
+/********************/
+
+/* find a one-color spot around a point p */
+set<PT>
+get_spot(const PNM &mask, const PT& p, int max){
+  set<PT> ret;
+  queue<PT> q;
+
+  int h = mask.get(0,p.x,p.y);
+  q.push(p); ret.insert(p);
+
+  while (!q.empty()){
+    PT p1 = q.front();
+    q.pop();
+    for (int i=0; i<8; i++){
+      PT p2 = p1.adj(i);
+      if (p2.x<0 || p2.x>=mask.w || p2.y<0 || p2.y>=mask.h) continue;
+      if ((mask.get(0,p2.x,p2.y) == h)&&(ret.insert(p2).second)) q.push(p2);
+    }
+    if ((max!=0)&&(ret.size()>max)) break;
+  }
+  return ret;
+}
+
+/* find a border of a point set */
+set<PT>
+border(const set<PT> & pset){
+  set<PT> ret;
+  set<PT>::const_iterator it;
+  for (it = pset.begin(); it != pset.end(); it++){
+    for (int i=0; i<8; i++){
+      PT p = it->adj(i);
+      if (pset.count(p)==0) ret.insert(p);
+    }
+  }
+  return ret;
+}
+
+void
+interp2(PNM &rgb, PNM &mask, cnv_t *cnv){
+  int x,y,x0,y0,xm,ym,xp,yp;
+  int rm,rp,gm,gp,bm,bp,dm,dp;
+  int intx,inty;
+
+  for (x=0; x<mask.w; x++){
+    for (y=0; y<mask.h; y++){
+      //  do we need interpolation of this point?
+      if (mask.get(0,x,y)==0) continue;
+
+
+      // find the whole interpolation area and its border
+      set<PT> pset = get_spot(mask, PT(x,y), 10000);
+      set<PT> bord = border(pset);
+      set<PT>::iterator pi, bi;
+
+      for (pi = pset.begin(); pi != pset.end(); pi++){
+        // convert to rgb coordinates
+        int xd = cnv->kx*pi->x + cnv->dx;
+        int yd = cnv->ky*pi->y + cnv->dy;
+        if (xd<0 || xd>=rgb.w || yd<0 || yd>=rgb.h) continue;
+
+        double SR=0, SG=0, SB=0, S=0;
+        for (bi = bord.begin(); bi != bord.end(); bi++){
+
+          // convert to rgb coordinates
+          int bxd = cnv->kx*bi->x + cnv->dx;
+          int byd = cnv->ky*bi->y + cnv->dy;
+          if (bxd<0 || bxd>=rgb.w || byd<0 || byd>=rgb.h) continue;
+
+          double w = 1.0/(double)(pow(bxd - xd,2) + pow(byd - yd,2));
+
+          S  += w;
+          SR += w*rgb.get(0,bxd,byd);
+          if (rgb.is_rgb()){
+            SG += w*rgb.get(1,bxd,byd);
+            SB += w*rgb.get(2,bxd,byd);
+          }
+        }
+
+        rgb.set(0, xd, yd, SR/S);
+        mask.set(0, pi->x, pi->y,0);
+        if (rgb.is_rgb()){
+          rgb.set(1, xd, yd, SG/S);
+          rgb.set(2, xd, yd, SB/S);
+        }
+      }
+    }
+  }
+}
+
 
 /**************************************************************************/
 
@@ -372,4 +494,69 @@ ir_shift(PNM &rgb, PNM &ir, int debug){
   cnv.dy = DY/n;
   fprintf(stderr, "> %f %f %d\n", DX/n, DY/n, n);
   return cnv;
+}
+
+/***************************************************************************/
+/* Find conversion from IR to RGB image */
+cnv_t
+ir_shift1(PNM &rgb, PNM &ir, int neg){
+
+  /* build a histogram of the IR channel */
+  int hist[ir.get_mcol()+1];
+  memset(hist,0, sizeof(hist));
+  for (int i=0; i<ir.w; i++){
+    for (int j=0; j<ir.h; j++){
+      hist[ir.get(0,i,j)]++;
+    }
+  }
+
+  /* find 0.1% dark level */
+  int sum=0, ll;
+  for (ll=0;ll<sizeof(hist);ll++){
+    if ( (sum+=hist[ll]) >= ir.w*ir.h/1000) break;
+  }
+
+  /* put all points below the level into a vector */
+  PTS ir_dark;
+  for (int i=0; i<ir.w; i++){
+    for (int j=0; j<ir.h; j++){
+      if (ir.get(0,i,j) < ll){ ir_dark.push_back(PT(i,j));
+      ir.set(0,i,j,0);}
+    }
+  }
+
+  /* */
+  int rad=10;
+  cnv_t ret;
+  int mval = ir_dark.size()*ir.get_mcol();
+  int s0m=mval;
+
+  for (int x1=-10; x1<=10; x1++){
+    for (int y1=-10; y1<=10; y1++){
+//       for (int x2=-10; x2<=10; x2++){
+//         for (int y2=-10; y2<=10; y2++){
+
+          cnv_t cnv; /* (0.0) -> (x1,y1), (ir.w,ir.h)->(rgb.w+x2,rgb.h+y2) */
+//          cnv.kx=(rgb.w+x2-x1)/(double)ir.w;
+//          cnv.ky=(rgb.h+y2-y1)/(double)ir.h;
+          cnv.dx=x1; cnv.dy=y1;
+          cnv.kx=1;
+          cnv.ky=1;
+
+          /* calculate sums */
+          long long s0=0;
+          for (PTS::const_iterator i=ir_dark.begin(); i!=ir_dark.end(); i++){
+            int xd = cnv.kx * i->x + cnv.dx;
+            int yd = cnv.ky * i->y + cnv.dy;
+            if (xd<0 || xd>=rgb.w || yd<0 || yd>=rgb.h) continue;
+            s0 += rgb.get(0,xd,yd);
+          }
+          if (neg) s0 = mval - s0;
+          if (s0<s0m) {s0m=s0; ret=cnv; }
+//        }
+//      }
+    }
+  }
+//  fprintf(stderr, "> %f %f %f %f\n", ret.kx, ret.ky, ret.dx, ret.dy);
+  return ret;
 }
