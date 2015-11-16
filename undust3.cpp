@@ -35,15 +35,12 @@ main(int argc, char *argv[]){
   PNM pnm(argv[optind]);
   PNM  ir(argv[optind+1]);
 
-  cnv.dx=cnv.dy=0;
-  cnv.kx=cnv.ky=1;
-//  cnv = ir_shift(pnm,ir,0);
-  cnv = ir_shift1(pnm,ir,0);
-
+  cnv = ir_shift(pnm,ir,0);
   ir_uncorr(pnm, ir, &cnv);
+
   PNM mask = detect_dust1(ir, thr);
   expand_dust(mask);
-  interp2(pnm, mask, &cnv);
+  interp(pnm, mask, &cnv);
 
 
   ir.save(argv[optind+2]);
