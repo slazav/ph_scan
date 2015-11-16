@@ -232,32 +232,6 @@ expand_dust(PNM &mask){
   }
 }
 
-
-/********************/
-/* point functions */
-PT
-PT::adj(const int dir) const{
-  switch(dir%8){
-    case 0: return PT(x-1,y-1);
-    case 1: return PT(x,  y-1);
-    case 2: return PT(x+1,y-1);
-    case 3: return PT(x+1,y  );
-    case 4: return PT(x+1,y+1);
-    case 5: return PT(x,  y+1);
-    case 6: return PT(x-1,y+1);
-    case 7: return PT(x-1,y  );
-  }
-  return PT();
-}
-
-int
-PT::is_adj(const PT & p) const{
-  for (int i = 0; i<8; i++){
-    if (p.adj(i) == PT(x,y)) return i; }
-  return -1;
-}
-
-
 /********************/
 
 /* find a one-color spot around a point p */

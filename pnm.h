@@ -3,6 +3,27 @@
 
 #include <cstring>
 #include <cassert>
+#include <vector>
+
+/********************************************************************/
+/* a 2D point (simplified mapsoft/iPoint class) */
+struct PT{
+  int x,y;
+  PT(int _x, int _y): x(_x), y(_y) { }
+  PT(): x(0), y(0) { }
+
+  bool operator< (const PT & other) const {
+    return (x<other.x) || ((x==other.x)&&(y<other.y));
+  }
+  bool operator== (const PT & other) const {
+    return (x==other.x)&&(y==other.y);
+  }
+
+  PT adj(const int dir) const;
+  int is_adj(const PT & p) const;
+};
+typedef std::vector<PT> PTS;
+
 
 /* a simple library for working with pnm files */
 /********************************************************************/
