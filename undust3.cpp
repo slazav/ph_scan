@@ -8,6 +8,7 @@
 void usage(void){
   fprintf(stderr, "usage: undust3 OPTIONS in_file ir_file out1 out2 out3\n");
   fprintf(stderr, "           -T # -- dust threshold 0 .. 1.0 -- default 0.06\n");
+  fprintf(stderr, "           -S   -- use scaling below the threshold\n");
   exit(0);
 }
 
@@ -17,14 +18,16 @@ main(int argc, char *argv[]){
   cnv_t cnv;
   int i,j;
   double thr=0.06;
+  int sc=0;
 
   /***************************************************************************/
   /* 1. Process command-line options */
   while (1){
-    i=getopt(argc, argv, "T:");
+    i=getopt(argc, argv, "T:S");
     if (i==-1) break;
     switch(i){
       case 'T': thr=atof(optarg); break;
+      case 'S': sc=1; break;
       default:  usage();
     }
   }
@@ -36,7 +39,9 @@ main(int argc, char *argv[]){
   PNM  ir(argv[optind+1]);
 
   cnv = ir_shift(pnm,ir,0);
+  if (sc) ir_mult(pnm, ir, cnv, thr);
   ir_uncorr(pnm, ir, cnv);
+
 
   PNM mask = detect_dust1(ir, thr);
   expand_dust(mask);
