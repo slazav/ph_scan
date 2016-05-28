@@ -10,8 +10,8 @@ prefix=${1-PIC}
 # scan resolution
 res=1200
 
-# mode: Color/Grey
-mode=Color
+# mode: Color/Gray
+mode=Gray
 
 # do the scanning process or skip it: yes/no
 doscan=yes
@@ -43,14 +43,6 @@ while [ $run == 1 ]; do
               --button-controlled=no\
               --verbose\
              > $fname.pnm
-    scanimage --device=pixma:04A9190D\
-              --source="Transparency Unit"\
-              --mode=Infrared\
-              --format=pnm \
-              --resolution=$res\
-              -l 76.41 -x 64.30 -t 20 -y 274\
-              --button-controlled=$multiple\
-             > ${fname}.ir
   fi
 
   # make small preview
