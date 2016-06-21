@@ -1,0 +1,18 @@
+#!/bin/sh
+
+mkdir -p jpg
+
+p=-p
+
+for i in *_u.pnm; do
+  base=${i%_u.pnm}
+  echo ${base}
+  ../undust3 "$@" -S ${base}_u.pnm ${base}_ir.pnm ${base}_ir1.pnm ${base}_d.pnm ${base}_b.pnm
+  ../undust3 "$@"    ${base}_u.pnm ${base}_ir.pnm ${base}_ir1.pnm ${base}_d.pnm ${base}_c.pnm
+  ../1628  $p -R 130 -G 140 -B 150 ${base}_c.pnm | cjpeg -quality 95 > jpg/${base}c.jpg
+  ../1628  $p -R 130 -G 140 -B 150 ${base}_b.pnm | cjpeg -quality 95 > jpg/${base}b.jpg
+  ../1628  $p -R 130 -G 140 -B 150 ${base}_u.pnm | cjpeg -quality 95 > jpg/${base}a.jpg
+  cjpeg -quality 95 ${base}_ir1.pnm> jpg/${base}d.jpg
+  convert ${base}_d.pnm jpg/${base}e.png
+  rm -f ${base}_ir1.pnm ${base}_d.pnm ${base}_b.pnm ${base}_c.pnm
+done
