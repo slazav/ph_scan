@@ -6,6 +6,8 @@
 #include <set>
 #include "utils.h"
 
+#define BRD 50
+
 using namespace std;
 
 /***************************************************************************/
@@ -17,8 +19,8 @@ ir_shift(const PNM &rgb, const PNM &ir, int neg){
   /* build a histogram of the IR channel */
   int hist[ir.get_mcol()+1];
   memset(hist,0, sizeof(hist));
-  for (p.x=0; p.x<ir.w; p.x++){
-    for (p.y=0; p.y<ir.h; p.y++){
+  for (p.x=BRD; p.x<ir.w-BRD; p.x++){
+    for (p.y=BRD; p.y<ir.h-BRD; p.y++){
       hist[ir.get(0,p)]++;
     }
   }
@@ -31,14 +33,14 @@ ir_shift(const PNM &rgb, const PNM &ir, int neg){
 
   /* put all points below the level into a vector */
   PTS ir_dark;
-  for (p.x=0; p.x<ir.w; p.x++){
-    for (p.y=0; p.y<ir.h; p.y++){
+  for (p.x=BRD; p.x<ir.w-BRD; p.x++){
+    for (p.y=BRD; p.y<ir.h-BRD; p.y++){
       if (ir.get(0,p) < ll) ir_dark.push_back(p);
     }
   }
 
   /* */
-  int rad=10;
+  int rad=9;
   cnv_t ret;
   int mval = ir.get_mcol();
   int s0m=mval;
