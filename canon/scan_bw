@@ -32,6 +32,9 @@ while [ $run == 1 ]; do
     fname="$(printf "%s%02d" $prefix $n)"
   done
 
+  # make small preview
+  pamscale -height 3200 $fname.pnm | pamflip -ccw | pnminvert | pnmgamma 0.1  | cjpeg > $fname.jpg
+
   # scan process (if doscan==yes)
   if [ "$doscan" == yes ]; then
     scanimage --device=pixma:04A9190D\
@@ -45,9 +48,6 @@ while [ $run == 1 ]; do
              > $fname.pnm
   fi
 
-  # make small preview
-  pamscale -height 3200 $fname.pnm | pamflip -ccw |\
-  pnminvert | pnmgamma 0.1  | cjpeg > $fname.jpg
   #if [ -f "$fname.fig" ]; then rm -f "$fname.fig"; fi
 
 

@@ -43,6 +43,11 @@ while [ $run == 1 ]; do
               --button-controlled=no\
               --verbose\
              > $fname.pnm
+
+  # make small preview
+  pamscale -height 3200 $fname.pnm | pamflip -ccw |\
+   pnminvert | pnmgamma 0.1  | cjpeg > $fname.jpg
+
     scanimage --device=pixma:04A9190D\
               --source="Transparency Unit"\
               --mode=Infrared\
@@ -53,9 +58,6 @@ while [ $run == 1 ]; do
              > ${fname}.ir
   fi
 
-  # make small preview
-  pamscale -height 3200 $fname.pnm | pamflip -ccw |\
-  pnminvert | pnmgamma 0.1  | cjpeg > $fname.jpg
   #if [ -f "$fname.fig" ]; then rm -f "$fname.fig"; fi
 
 
