@@ -25,12 +25,15 @@ main(int argc, char *argv[]){
   int      dh=100;
   int      neg=1;
   int      brd=200;
+  double   lth = 1, hth = 0; // thresholds, per cent
   int      aval[3]={130,140,150};
   int      cw=6, type;
   int      l=100,d=100;
   unsigned max[3], min[3];
   double   avr[3];
   double A[3], B[3], C[3];
+  long int H[3][0x10000]; //  histogram
+
   FILE     *IN=NULL;
   long     pos;
 
@@ -40,13 +43,15 @@ main(int argc, char *argv[]){
     fprintf(stderr, "           -R #  -- A-value for R 1-254 -- default 64\n");
     fprintf(stderr, "           -G #  -- A-value for G 1-254 -- default 64\n");
     fprintf(stderr, "           -B #  -- A-value for B 1-254 -- default 64\n");
+    fprintf(stderr, "           -L #  -- low threshold, %% -- default 1.0\n");
+    fprintf(stderr, "           -H #  -- high threshold, %% -- default 0.0\n");
     fprintf(stderr, "           -n    -- input is negative (default)\n");
     fprintf(stderr, "           -p    -- input is positive\n");
     exit(0);
   }
 
   while (1){
-    i=getopt(argc, argv, "R:G:B:b:pn");
+    i=getopt(argc, argv, "R:G:B:b:L:H:pn");
     if (i==-1) break;
     switch(i){
       case 'R': 
@@ -61,6 +66,8 @@ main(int argc, char *argv[]){
         aval[2]=atoi(optarg); 
         if ((aval[2]<1)||(aval[2]>254)) usage();
         break;
+      case 'L': lth=atof(optarg); if ((lth<0)||(lth>=100)) usage(); break;
+      case 'H': hth=atof(optarg); if ((hth<0)||(hth>=100)) usage(); break;
       case 'b': brd=atoi(optarg); break;
       case 'n': neg=1; break;
       case 'p': neg=0; break;
@@ -70,7 +77,8 @@ main(int argc, char *argv[]){
 
   if (argc-optind!=1) usage();
 
-  /* 1st pass: read file information and color ranges */
+  /************************************************/
+  /* read file information */
 
   /* Process PNM header*/
   IN=fopen(argv[optind], "r");
@@ -92,43 +100,80 @@ main(int argc, char *argv[]){
   else if (type==6) cw=6; /* color */
   else {fprintf(stderr, "Bad file type: %d\n", type); exit(0);}
 
-  if (mp<256) {fprintf(stderr, "Bad number of colors: %d\n", mp); exit(0);}
+  if (mp!=0xFFFF) {fprintf(stderr, "Bad number of colors: %d\n", mp); exit(0);}
   buf=(unsigned char *)malloc(w*cw);
   if (buf==NULL) {fprintf(stderr, "Can't allocate memory!\n"); exit(0);}
+  pos = ftell(IN);
 
-  pos=ftell(IN);
 
-  /* Calculate MIN/MAX/AVRG for color values */
-  for (i=0;i<3;i++){max[i]=0; min[i]=mp; avr[i]=0;}
+  /************************************************/
+  /* build histogram */
+
+  memset(H, 0, sizeof(H));
+  n = 0;
   if (h-2*brd-1<=0 || w-2*brd-1<=0){
     fprintf(stderr, "Too large border!\n"); exit(0); }
-  n=(h-2*brd-1)*(w-2*brd-1);
 
-  for (i=brd;i<h-brd;i++){
+  for (i=0;i<h;i++){
     if (fread(buf, cw, w, IN)!=w) {fprintf(stderr, "Read Error!\n"); exit(0);}
-
+    if (i<brd) continue;
+    if (i>=h-brd) break;
     for (j=brd;j<w-brd;j++){
       if (cw==2){
         int col=get16(buf+cw*j);
-        max[0]=MAX(max[0],col);
-        min[0]=MIN(min[0],col);
-        avr[0]+=(double)col/n;
+        H[0][col&0xFFFF]++;
       }
       else {
         int r=get16(buf+cw*j);
         int g=get16(buf+cw*j+2);
         int b=get16(buf+cw*j+4);
-        max[0]=MAX(max[0],r);
-        max[1]=MAX(max[1],g);
-        max[2]=MAX(max[2],b);
-        min[0]=MIN(min[0],r);
-        min[1]=MIN(min[1],g);
-        min[2]=MIN(min[2],b);
-        avr[0]+=(double)r/n;
-        avr[1]+=(double)g/n;
-        avr[2]+=(double)b/n;
+        H[0][r&0xFFFF]++;
+        H[1][g&0xFFFF]++;
+        H[2][b&0xFFFF]++;
+      }
+      n++;
+    }
+  }
+
+  /************************************************/
+  /* Calculate MIN/MAX/AVRG for color values */
+
+  {
+    for (i=0;i<3;i++){max[i]=mp-1; min[i]=0; avr[i]=0;}
+    long int sr1=0, sg1=0, sb1=0;
+    long int sr2=0, sg2=0, sb2=0;
+    lth*=n/100.0;
+    hth*=n/100.0;
+    for (i=0; i<0x10000; i++){
+      j = mp-i+1;
+      if (cw==2){
+        sr1+=H[0][i];
+        sr2+=H[0][j];
+        if (sr1<lth+1) min[0]=i;
+        if (sr2<hth+1) max[0]=j;
+        avr[0]+=(double)(H[0][i])*i;
+      }
+      else {
+        sr1+=H[0][i];
+        sr2+=H[0][j];
+        sg1+=H[1][i];
+        sg2+=H[1][j];
+        sb1+=H[2][i];
+        sb2+=H[2][j];
+        if (sr1<lth+1) min[0]=i;
+        if (sr2<hth+1) max[0]=j;
+        if (sg1<lth+1) min[1]=i;
+        if (sg2<hth+1) max[1]=j;
+        if (sb1<lth+1) min[2]=i;
+        if (sb2<hth+1) max[2]=j;
+        avr[0]+=(double)H[0][i]*i;
+        avr[1]+=(double)H[1][i]*i;
+        avr[2]+=(double)H[2][i]*i;
       }
     }
+    avr[0]/=n;
+    avr[1]/=n;
+    avr[2]/=n;
   }
 
 //  fprintf(stderr, "%d %d %d  %d %d %d  %d %d %d\n",
@@ -137,6 +182,7 @@ main(int argc, char *argv[]){
 //          min[2], (unsigned)avr[2], max[2]);
 
 
+  /************************************************/
   /* return back and do the color correction */
   fseek(IN, pos, SEEK_SET);
 
