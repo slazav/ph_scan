@@ -81,7 +81,7 @@ ir_shift(const PNM &rgb, const PNM &ir, int neg){
 /**************************************************************************/
 
 /* reduce dispersion of the IR channel using RGB image */
-int
+void
 ir_uncorr(const PNM &rgb, PNM &ir, const cnv_t &cnv){
   PT p;
   int n=0;
@@ -186,11 +186,10 @@ ir_uncorr(const PNM &rgb, PNM &ir, const cnv_t &cnv){
       }
     }
   }
-  return 0;
 }
 
 /* tune rgb values according to IR channel */
-int
+void
 ir_mult(PNM &rgb, const PNM &ir, const cnv_t &cnv, double thr){
   PT p;
   int n=0;

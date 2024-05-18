@@ -60,7 +60,7 @@ class PNM {
   int is_rgb() const {return get_type()==6;}
   int save(const char *fname) const;
 
-  int calc_mmm(int &min, int &mean, int &max, int ch) const;
+  void calc_mmm(int &min, int &mean, int &max, int ch) const;
   int is_in(const PT &p) const {
     return p.x>=0 && p.x<w && p.y>=0 && p.y<h; }
 

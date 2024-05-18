@@ -103,7 +103,7 @@ PNM::save(const char *fname) const{
   return 0;
 }
 
-int
+void
 PNM::calc_mmm(int &min, int &mean, int &max, int ch) const{
   int x,y,v;
   long long sum=0;

@@ -10,10 +10,10 @@ typedef struct{ /* 4-parameter conversion */
 cnv_t ir_shift(const PNM &rgb, const PNM &ir, int neg=1);
 
 /* reduce dispersion of the IR channel using RGB image */
-int ir_uncorr(const PNM &rgb, PNM &ir, const cnv_t &cnv);
+void ir_uncorr(const PNM &rgb, PNM &ir, const cnv_t &cnv);
 
 /* tune RGB channel at weak variations of IR channel */
-int ir_mult(PNM &rgb, const PNM &ir, const cnv_t &cnv, double thr);
+void ir_mult(PNM &rgb, const PNM &ir, const cnv_t &cnv, double thr);
 
 PNM detect_dust1(PNM &ir, double thr);
 void expand_dust(PNM &mask);
