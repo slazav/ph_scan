@@ -118,8 +118,8 @@ ir_uncorr(const PNM &rgb, PNM &ir, const cnv_t &cnv){
   */
 
   /* calculate average values */
-  for (p.x=0; p.x<ir.w; p.x++){
-    for (p.y=0; p.y<ir.h; p.y++){
+  for (p.x=BRD; p.x<ir.w-BRD; p.x++){
+    for (p.y=BRD; p.y<ir.h-BRD; p.y++){
       PT pd(cnv.kx*p.x + cnv.dx,
             cnv.ky*p.y + cnv.dy);
       if (!rgb.is_in(pd)) continue;
@@ -135,8 +135,8 @@ ir_uncorr(const PNM &rgb, PNM &ir, const cnv_t &cnv){
   mR/=n; mG/=n; mB/=n; mI/=n;
 
   /* calculate correlations */
-  for (p.x=0; p.x<ir.w; p.x++){
-    for (p.y=0; p.y<ir.h; p.y++){
+  for (p.x=BRD; p.x<ir.w-BRD; p.x++){
+    for (p.y=BRD; p.y<ir.h-BRD; p.y++){
       PT pd(cnv.kx*p.x + cnv.dx,
             cnv.ky*p.y + cnv.dy);
       if (!rgb.is_in(pd)) continue;
