@@ -27,6 +27,7 @@ foreach my $n (@ARGV){
   print "Processing $n\n";
 
   # dimensions of the pnm file
+  next unless -s $pnm;
   open F, $pnm or die "can't open $pnm: $!\n";
   my $l=readline(F); #P6
   $l=readline(F); 
@@ -76,7 +77,6 @@ foreach my $n (@ARGV){
     }
   }
 
-
   # process frames:
   my $num=0;
   foreach (sort {$a->{sortkey} <=> $b->{sortkey}} @frames){
@@ -86,6 +86,11 @@ foreach my $n (@ARGV){
     my $x2 = int($W - $_->{y1}/$fH*$W);
     my $y1 = int($_->{x1}/$fW*$H);
     my $y2 = int($_->{x2}/$fW*$H);
+
+    $y2=$H if $y2>$H;
+    $x2=$W if $x2>$W;
+    $y1=0  if $y1<0;
+    $x1=0  if $x1<0;
 
     # Infrared size calibration (non-rotated coords).
     # Measured IR->PIC coordinates
@@ -118,20 +123,19 @@ foreach my $n (@ARGV){
     `pamcut -left $x1 -right $x2 -top $y1 -bottom $y2 $pnm |\
        pamflip -ccw $flt > ${n}/${t}_u.pnm`;
     `./1628 -R 130 -G 140 -B 150 ${n}/${t}_u.pnm |\
-        cjpeg -quality 95 > ${n}/${t}o.jpg`;
+        cjpeg -quality 100 > ${n}/${t}_u.jpg`;
 
     # IR 16-bit pnm image
     `pamcut -left $x1i -right $x2i -top $y1i -bottom $y2i $ir |\
        pamscale -width $frW -height $frH |\
        pamflip -ccw $flt > ${n}/${t}_ir.pnm`;
-    #`cat ${n}/${t}_ir.pnm | cjpeg -quality 95 > ${n}/${t}_ir.jpg`;
+    `cat ${n}/${t}_ir.pnm | cjpeg -quality 100 > ${n}/${t}_ir.jpg`;
 
     # corrected image
-    #`./undust2 -T 0.06 -R 10 -D ${n}/${t}_d.pnm ${n}/$t.pnm ${n}/${t}_ir.pnm|\
-    #   > ${n}/${t}_corr.pnm`;
-    #`./1628 -R 125 -G 135 -B 145 ${n}/${t}_corr.pnm |\
-    #    cjpeg -quality 95 > ${n}/${t}_corr.jpg`;
-    #`cat ${n}/${t}_d.pnm | cjpeg -quality 95 > ${n}/${t}_d.jpg`;
+#    `./undust3 ${n}/${t}_u.pnm ${n}/${t}_ir.pnm ${n}/${t}_ir1.pnm ${n}/${t}_msk.pnm ${n}/${t}_c.pnm`;
+#    `./1628 -R 125 -G 135 -B 145 ${n}/${t}_c.pnm |\
+#        cjpeg -quality 95 > ${n}/${t}_c.jpg`;
+#    `cat ${n}/${t}_.pnm | cjpeg -quality 95 > ${n}/${t}_d.jpg`;
 
   }
 
