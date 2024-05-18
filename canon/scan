@@ -1,8 +1,9 @@
 #!/bin/bash -efu
 
 # Scan image with Canon 9000f scanner,
-# write huge pnm + jpeg preview.
+# write huge pnm + jpeg preview + infrared channel.
 # Then you need to mark frames in xfig...
+# Do not forget to unlock the scanner and to remove cover of the upper lamp!
 
 # prefix from cmdline or default
 prefix=${1-PIC}
@@ -32,8 +33,8 @@ while [ $run == 1 ]; do
     fname="$(printf "%s%02d" $prefix $n)"
   done
 
-  # scan process (if doscan==yes)
   if [ "$doscan" == yes ]; then
+    # scan image (if doscan==yes)
     scanimage --device=pixma:04A9190D\
               --source="Transparency Unit"\
               --mode=$mode\
@@ -44,10 +45,11 @@ while [ $run == 1 ]; do
               --verbose\
              > $fname.pnm
 
-  # make small preview
-  pamscale -height 3200 $fname.pnm | pamflip -ccw |\
-   pnminvert | pnmgamma 0.1  | cjpeg > $fname.jpg
+    # make small preview
+    pamscale -height 3200 $fname.pnm | pamflip -ccw |\
+      pnminvert | pnmgamma 0.1  | cjpeg > $fname.jpg
 
+    # scan infrared
     scanimage --device=pixma:04A9190D\
               --source="Transparency Unit"\
               --mode=Infrared\
@@ -59,6 +61,5 @@ while [ $run == 1 ]; do
   fi
 
   #if [ -f "$fname.fig" ]; then rm -f "$fname.fig"; fi
-
 
 done
