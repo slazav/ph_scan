@@ -6,7 +6,7 @@
 #include "utils.h"
 
 void usage(void){
-  fprintf(stderr, "usage: undust3 OPTIONS in_file ir_file out1 out2 out3\n");
+  fprintf(stderr, "usage: undust3 OPTIONS in_file ir_file out_ir out_mask out_pnm\n");
   fprintf(stderr, "           -T # -- dust threshold 0 .. 1.0 -- default 0.06\n");
   fprintf(stderr, "           -S   -- use scaling below the threshold\n");
   exit(0);
