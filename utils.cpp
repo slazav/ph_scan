@@ -74,7 +74,7 @@ ir_shift(const PNM &rgb, const PNM &ir, int neg){
 //      }
     }
   }
-  fprintf(stderr, "> %f %f %f %f\n", ret.kx, ret.ky, ret.dx, ret.dy);
+//  fprintf(stderr, "> %f %f %f %f\n", ret.kx, ret.ky, ret.dx, ret.dy);
   return ret;
 }
 
@@ -84,20 +84,10 @@ ir_shift(const PNM &rgb, const PNM &ir, int neg){
 void
 ir_uncorr(const PNM &rgb, PNM &ir, const cnv_t &cnv){
   PT p;
-  int n=0;
-  /* mean values */
-  double mR=0, mG=0, mB=0, mI=0;
-  /* correlations */
-  double RR=0, RG=0, RB=0,
-               GG=0, GB=0,
-                     BB=0,
-         IR=0, IB=0, IG=0;
-  double dR,dG,dB,dI;
-  double d0,d1,d2,d3;
-  double A,B,C;
-  /* Weights of other channels in IR:
-       The correction is I1 = I+ a R + b G + c B;
+  /* Weights of other channels in IR channel:
+       The correction is I1 = I + a R + b G + c B;
        We want to minimize <(I1 - <I1>)^2>
+
        d/da=0:  <(I1 - <I1>)(R - <R>)> =
                 <(I -<I>)(R-<R>)> + a <(R -<R>)^2>
                    + b <(G-<G>)(R -<R>)> + b <(B-<B>)(R -<R>)> = 0
@@ -118,6 +108,8 @@ ir_uncorr(const PNM &rgb, PNM &ir, const cnv_t &cnv){
   */
 
   /* calculate average values */
+  double mR=0, mG=0, mB=0, mI=0;
+  int n=0;
   for (p.x=BRD; p.x<ir.w-BRD; p.x++){
     for (p.y=BRD; p.y<ir.h-BRD; p.y++){
       PT pd(cnv.kx*p.x + cnv.dx,
@@ -135,6 +127,12 @@ ir_uncorr(const PNM &rgb, PNM &ir, const cnv_t &cnv){
   mR/=n; mG/=n; mB/=n; mI/=n;
 
   /* calculate correlations */
+  /* correlations */
+  double RR=0, RG=0, RB=0,
+               GG=0, GB=0,
+                     BB=0,
+         IR=0, IB=0, IG=0;
+  double dR,dG,dB,dI;
   for (p.x=BRD; p.x<ir.w-BRD; p.x++){
     for (p.y=BRD; p.y<ir.h-BRD; p.y++){
       PT pd(cnv.kx*p.x + cnv.dx,
@@ -143,30 +141,32 @@ ir_uncorr(const PNM &rgb, PNM &ir, const cnv_t &cnv){
 
       dR = (double)rgb.get(0,pd) - mR;
       dI = (double)ir.get(0,p) - mI;
-      RR += dR*dR;
-      IR += dI*dR;
+      RR += dR*dR/n;
+      IR += dI*dR/n;
       if (rgb.is_rgb()){ /* rgb */
-        dG = (double)rgb.get(0,pd) - mG;
-        dB = (double)rgb.get(0,pd) - mB;
-        RG += dR*dG;
-        RB += dR*dB;
-        GG += dG*dG;
-        GB += dG*dB;
-        BB += dB*dB;
-        IG += dI*dG;
-        IB += dI*dB;
+        dG = (double)rgb.get(1,pd) - mG;
+        dB = (double)rgb.get(2,pd) - mB;
+        RG += dR*dG/n;
+        RB += dR*dB/n;
+        GG += dG*dG/n;
+        GB += dG*dB/n;
+        BB += dB*dB/n;
+        IG += dI*dG/n;
+        IB += dI*dB/n;
       }
     }
   }
+
   /* solve linear system (for greyscale image almost all correlations are 0) */
-  d0 = RR*GG*BB + RB*RG*GB + RG*GB*RB - RB*GG*RB - RG*RG*BB - RR*GB*GB;
-  d1 = IR*GG*BB + IB*RG*GB + IG*GB*RB - IB*GG*RB - IG*RG*BB - IR*GB*GB;
-  d2 = RR*IG*BB + RB*IR*GB + RG*IB*RB - RB*IG*RB - RG*IR*BB - RR*IB*GB;
-  d3 = RR*GG*IB + RB*RG*IG + RG*GB*IR - RB*GG*IR - RG*RG*IB - RR*GB*IG;
-  A = d1/d0;
-  B = d2/d0;
-  C = d3/d0;
-  //fprintf(stderr, "> %f %f %f\n", A,B,C);
+  double d0 = RR*GG*BB + RB*RG*GB + RG*GB*RB - RB*GG*RB - RG*RG*BB - RR*GB*GB;
+  double d1 = IR*GG*BB + IB*RG*GB + IG*GB*RB - IB*GG*RB - IG*RG*BB - IR*GB*GB;
+  double d2 = RR*IG*BB + RB*IR*GB + RG*IB*RB - RB*IG*RB - RG*IR*BB - RR*IB*GB;
+  double d3 = RR*GG*IB + RB*RG*IG + RG*GB*IR - RB*GG*IR - RG*RG*IB - RR*GB*IG;
+  double A = d1/d0;
+  double B = d2/d0;
+  double C = d3/d0;
+//  fprintf(stderr, "> %f %f %f  %f %f %f\n", RR,GG,BB, RG, RB, GB);
+//  fprintf(stderr, "> %f %f %f\n", A,B,C);
 
   /* modify IR image */
   for (p.x=0; p.x<ir.w; p.x++){
